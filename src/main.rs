@@ -14,10 +14,10 @@ use libc::consts::os::posix88 as posix88_c;
 use libc::consts::os::extra;
 
 fn read_print_file(path: &str) {
-    let cstr = CString::new(path).unwrap();
+    let c_path = CString::new(path).unwrap();
     let fd = unsafe {
         posix88_f::fcntl::open(
-            cstr.as_ptr(),
+            c_path.as_ptr(),
             posix88_c::O_RDONLY,
             0)
     };
