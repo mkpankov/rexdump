@@ -9,23 +9,26 @@ use std::io::Write;
 use std::process;
 
 use libc::types::common::c95::c_void;
+use libc::funcs::posix88 as posix88_f;
+use libc::consts::os::posix88 as posix88_c;
+use libc::consts::os::extra;
 
 fn read_print_file(path: &str) {
     let cstr = CString::new(path).unwrap();
     let fd = unsafe {
-        libc::funcs::posix88::fcntl::open(
+        posix88_f::fcntl::open(
             cstr.as_ptr(),
-            libc::consts::os::posix88::O_RDONLY,
+            posix88_c::O_RDONLY,
             0)
     };
 
     let address = unsafe {
-        libc::funcs::posix88::mman::mmap(
+        posix88_f::mman::mmap(
             0 as *mut c_void,
             4096,
-            libc::consts::os::posix88::PROT_READ,
-            libc::consts::os::posix88::MAP_PRIVATE
-          | libc::consts::os::extra::MAP_POPULATE,
+            posix88_c::PROT_READ,
+            posix88_c::MAP_PRIVATE
+          | extra::MAP_POPULATE,
             fd,
             0
             )
@@ -38,7 +41,7 @@ fn read_print_file(path: &str) {
     println!("{:?}", buffer);
 
     unsafe {
-        libc::funcs::posix88::unistd::close(fd);
+        posix88_f::unistd::close(fd);
     }
 }
 
