@@ -22,8 +22,16 @@ fn print_hex(buffer: &[u8], buffer_size: i64, line_width: i64) {
 
 }
 
-fn align_delimiter(line_size: i64, line_width_elements: i64) {
+fn align_delimiter(line_size_current: i64, line_size_full: i64) {
+    for _ in line_size_current..line_size_full {
+        print!("   ");
+    }
 
+    if line_size_current < line_size_full / 2 {
+        print!(" ");
+    }
+
+    print!(" |");
 }
 
 fn print_chars(buffer: &[u8], line_size: i64) {
