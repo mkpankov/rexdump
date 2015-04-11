@@ -150,7 +150,8 @@ fn read_print_file(path: &str) -> Result<(), ()> {
         };
 
         let buffer : &[u8] = unsafe {
-            std::slice::from_raw_parts(address as *const u8, 4096)
+            std::slice::from_raw_parts(
+                address as *const u8, std::num::cast(map_size).unwrap())
         };
 
         print_contents(buffer, std::num::cast(map_size).unwrap(), offset);
