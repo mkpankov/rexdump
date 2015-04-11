@@ -15,7 +15,7 @@ use libc::consts::os::extra;
 use libc::funcs::c95::stdio;
 
 fn print_offset(offset: i64) {
-
+    print!("{:08x}  ", offset)
 }
 
 fn print_hex(buffer: &[u8], buffer_size: i64, line_width: i64) {
@@ -37,7 +37,6 @@ fn print_contents(buffer: &[u8], buffer_size: i64, offset: i64) {
 
     let line_width_elements = 16;
     let mut remaining_buffer_size = buffer_size;
-    let mut line_number = 0;
     let mut current_offset = offset;
 
     for line in buffer.chunks(line_width_elements as usize) {
@@ -50,7 +49,7 @@ fn print_contents(buffer: &[u8], buffer_size: i64, offset: i64) {
             break;
         }
 
-        print_offset(line_number * line_width_elements + current_offset);
+        print_offset(current_offset);
 
         print_hex(
             line,
@@ -63,10 +62,13 @@ fn print_contents(buffer: &[u8], buffer_size: i64, offset: i64) {
 
         println!("|");
 
-        line_number += 1;
         current_offset += line_size;
         remaining_buffer_size -= line_size;
     }
+
+    print_offset(current_offset);
+
+    println!("");
 }
 
 fn read_print_file(path: &str) -> Result<(), ()> {
