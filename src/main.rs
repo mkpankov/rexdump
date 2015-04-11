@@ -18,8 +18,13 @@ fn print_offset(offset: i64) {
     print!("{:08x}  ", offset)
 }
 
-fn print_hex(buffer: &[u8], buffer_size: i64, line_width: i64) {
-
+fn print_hex(buffer: &[u8], line_width: i64) {
+    for (i, c) in (0..).zip(buffer.iter()) {
+        print!("{:02x} ", c);
+        if i == line_width / 2 - 1 {
+            print!(" ");
+        }
+    }
 }
 
 fn align_delimiter(line_size_current: i64, line_size_full: i64) {
@@ -34,8 +39,18 @@ fn align_delimiter(line_size_current: i64, line_size_full: i64) {
     print!(" |");
 }
 
-fn print_chars(buffer: &[u8], line_size: i64) {
-
+fn print_chars(buffer: &[u8]) {
+    for c in buffer {
+        let is_print = unsafe {
+            libc::funcs::c95::ctype::isprint(
+                std::num::cast(*c).unwrap()) != 0
+        };
+        if is_print {
+            print!("{}", *c as char);
+        } else {
+            print!(".")
+        }
+    }
 }
 
 fn print_contents(buffer: &[u8], buffer_size: i64, offset: i64) {
@@ -61,12 +76,11 @@ fn print_contents(buffer: &[u8], buffer_size: i64, offset: i64) {
 
         print_hex(
             line,
-            line_size,
             line_width_elements);
 
         align_delimiter(line_size, line_width_elements);
 
-        print_chars (line, line_size);
+        print_chars (line);
 
         println!("|");
 
