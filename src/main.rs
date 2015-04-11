@@ -5,7 +5,7 @@ extern crate libc;
 use std::ffi::CString;
 
 use std::env;
-use std::io::{self, Write, Stderr};
+use std::io::Write;
 use std::process;
 
 use libc::types::common::c95::c_void;
