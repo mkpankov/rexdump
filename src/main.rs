@@ -1,19 +1,20 @@
-#![feature(libc)]
+#![feature(core, libc, page_size)]
 
 extern crate libc;
 
 use std::ffi::CString;
 
 use std::env;
-use std::io::Write;
+use std::io::{self, Write, Stderr};
 use std::process;
 
 use libc::types::common::c95::c_void;
 use libc::funcs::posix88 as posix88_f;
 use libc::consts::os::posix88 as posix88_c;
 use libc::consts::os::extra;
+use libc::funcs::c95::stdio;
 
-fn read_print_file(path: &str) {
+fn read_print_file(path: &str, stderr: &mut Stderr) -> Result<(), ()> {
     let c_path = CString::new(path).unwrap();
     let fd = unsafe {
         posix88_f::fcntl::open(
@@ -21,28 +22,82 @@ fn read_print_file(path: &str) {
             posix88_c::O_RDONLY,
             0)
     };
-
-    let address = unsafe {
-        posix88_f::mman::mmap(
-            0 as *mut c_void,
-            4096,
-            posix88_c::PROT_READ,
-            posix88_c::MAP_PRIVATE
-          | extra::MAP_POPULATE,
-            fd,
-            0
-            )
+    if fd == -1 {
+        let c_error = CString::new("Couldn't open file").unwrap();
+        unsafe {
+            stdio::perror(c_error.as_ptr());
+        }
+        return Err(());
+    }
+    let mut file_info : libc::types::os::arch::posix01::stat = unsafe {
+        std::mem::uninitialized()
     };
-
-    let buffer : &[u8] = unsafe {
-        std::slice::from_raw_parts(address as *const u8, 4096)
+    let result = unsafe {
+        posix88_f::stat_::fstat(fd, & mut file_info)
     };
+    if result == -1 {
+        let c_error = CString::new("Couldn't get file into").unwrap();
+        unsafe {
+            stdio::perror(c_error.as_ptr());
+        }
+        return Err(());
+    }
+    let mut remaining_file_size = file_info.st_size;
+    let page_size : i64 = std::num::cast(std::env::page_size()).unwrap();
+    let mut offset = 0;
+    while remaining_file_size > 0 {
+        let map_size: u64 = std::num::cast(
+            if remaining_file_size > page_size {
+                page_size
+            } else {
+                remaining_file_size
+            }).unwrap();
+        let address = unsafe {
+            posix88_f::mman::mmap(
+                0 as *mut c_void,
+                map_size,
+                posix88_c::PROT_READ,
+                posix88_c::MAP_PRIVATE
+              | extra::MAP_POPULATE,
+                fd,
+                offset)
+        };
+        if address == posix88_c::MAP_FAILED {
+            let c_error = CString::new("Couldn't read file").unwrap();
+            unsafe {
+                stdio::perror(c_error.as_ptr());
+            }
+            return Err(());
+        };
 
-    println!("{:?}", buffer);
+        let buffer : &[u8] = unsafe {
+            std::slice::from_raw_parts(address as *const u8, 4096)
+        };
+
+        println!("{:?}", buffer);
+
+        let result = unsafe {
+            posix88_f::mman::munmap(
+                address,
+                map_size)
+        };
+        if result == -1 {
+            let c_error = CString::new("Couldn't unmap file").unwrap();
+            unsafe {
+                stdio::perror(c_error.as_ptr());
+            }
+        }
+
+        let diff: i64 = std::num::cast(map_size).unwrap();
+        remaining_file_size -= diff;
+        offset += diff;
+    }
 
     unsafe {
         posix88_f::unistd::close(fd);
     }
+
+    Ok(())
 }
 
 fn main() {
