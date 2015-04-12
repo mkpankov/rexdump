@@ -16,15 +16,19 @@ use num::traits::NumCast;
 use std::ffi::CString;
 
 use std::env;
-use std::io::Write;
+use std::io::{self, Write};
 use std::process;
+
+fn errno() -> i32 {
+    io::Error::last_os_error().raw_os_error().unwrap_or(-1)
+}
 
 struct Fd {
     raw_fd: c95_t::c_int,
 }
 
 impl Fd {
-    pub fn open(path: &str) -> Fd {
+    pub fn open(path: &str) -> Result<Fd, i32> {
         let c_path = CString::new(path).unwrap();
         let fd = unsafe {
             posix88_f::fcntl::open(
@@ -32,7 +36,11 @@ impl Fd {
                 posix88_c::O_RDONLY,
                 0)
         };
-        Fd { raw_fd: fd }
+        if fd == -1 {
+            return Err(errno());
+        }
+
+        Ok(Fd { raw_fd: fd })
     }
     pub fn raw(&self) -> c95_t::c_int {
         self.raw_fd
@@ -127,13 +135,17 @@ fn print_contents(buffer: &[u8], buffer_size: i64, offset: i64) {
 }
 
 fn read_print_file(path: &str) -> Result<(), ()> {
-    let fd = Fd::open(path);
-    if fd.raw() == -1 {
-        let c_error = CString::new("Couldn't open file").unwrap();
-        unsafe {
-            stdio::perror(c_error.as_ptr());
+    let maybe_fd = Fd::open(path);
+    let fd: Fd;
+    match maybe_fd {
+        Ok(f) => fd = f,
+        Err(_) => {
+            let c_error = CString::new("Couldn't open file").unwrap();
+            unsafe {
+                stdio::perror(c_error.as_ptr());
+            }
+            return Err(());
         }
-        return Err(());
     }
     let mut file_info : posix01::stat = unsafe {
         std::mem::uninitialized()
