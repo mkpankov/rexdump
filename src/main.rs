@@ -6,17 +6,14 @@ extern crate num;
 use libc::types::os::arch::posix01;
 use libc::funcs::posix88 as posix88_f;
 use libc::funcs::c95 as c95_f;
-use libc::types::os::arch::c95 as c95_t;
 
 use num::traits::NumCast;
 
 use std::ffi::CString;
-use std::ffi::CStr;
 
 use std::env;
 use std::io::{self, Write};
 use std::process;
-use std::str;
 
 fn errno() -> i32 {
     io::Error::last_os_error().raw_os_error().unwrap_or(-1)
@@ -27,15 +24,21 @@ fn print_error(error: &str) {
     writeln!(&mut stderr, "{}", error).unwrap();
 }
 
-fn strerror(errno: c95_t::c_int) -> &'static str {
-    let s = unsafe {
-        c95_f::string::strerror(errno)
-    };
-    unsafe {
-        str::from_utf8(CStr::from_ptr(s).to_bytes()).unwrap()
+mod c_helpers {
+    use libc::types::os::arch::c95 as c95_t;
+    use libc::funcs::c95 as c95_f;
+    use std::ffi::CStr;
+    use std::str;
+
+    pub fn strerror(errno: c95_t::c_int) -> &'static str {
+        let s = unsafe {
+            c95_f::string::strerror(errno)
+        };
+        unsafe {
+            str::from_utf8(CStr::from_ptr(s).to_bytes()).unwrap()
+        }
     }
 }
-
 
 mod fd {
     use libc::types::os::arch::c95 as c95_t;
@@ -217,7 +220,8 @@ fn read_print_file(path: &str) -> Result<(), ()> {
     match maybe_fd {
         Ok(f) => fd = f,
         Err(errno) => {
-            print_error(&format!("Couldn't open file: {}", strerror(errno)));
+            print_error(
+                &format!("Couldn't open file: {}", c_helpers::strerror(errno)));
             return Err(());
         }
     }
@@ -250,7 +254,8 @@ fn read_print_file(path: &str) -> Result<(), ()> {
         match maybe_memory_map {
             Ok(m) => memory_map = m,
             Err(errno) => {
-                print_error(&format!("Couldn't read file: {}", strerror(errno)));
+                print_error(
+                    &format!("Couldn't read file: {}", c_helpers::strerror(errno)));
                 return Err(());
             }
         }
