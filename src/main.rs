@@ -3,11 +3,8 @@
 extern crate libc;
 extern crate num;
 
-use libc::types::common::c95::c_void;
 use libc::types::os::arch::posix01;
 use libc::funcs::posix88 as posix88_f;
-use libc::consts::os::posix88 as posix88_c;
-use libc::consts::os::extra;
 use libc::funcs::c95 as c95_f;
 use libc::types::os::arch::c95 as c95_t;
 
@@ -41,7 +38,6 @@ fn strerror(errno: c95_t::c_int) -> &'static str {
 
 
 mod fd {
-    use libc::types::common::c95::c_void;
     use libc::types::os::arch::c95 as c95_t;
 
     use libc::consts::os::posix88 as posix88_c;
@@ -83,47 +79,58 @@ mod fd {
     }
 }
 
-struct MemoryMap {
-    address: * mut c_void,
-    length: u64,
-}
+mod memory_map {
+    use std::slice;
+    use num::traits::NumCast;
+    use libc::consts::os::posix88 as posix88_c;
+    use libc::funcs::posix88 as posix88_f;
+    use libc::types::common::c95::c_void;
+    use libc::consts::os::extra;
+    use libc::types::os::arch::c95 as c95_t;
 
-impl MemoryMap {
-    pub fn map(fd: c95_t::c_int, offset: i64, length: u64)
-               -> Result<MemoryMap, i32>
-    {
-        let address = unsafe {
-            posix88_f::mman::mmap(
-                0 as *mut c_void,
-                length,
-                posix88_c::PROT_READ,
-                posix88_c::MAP_PRIVATE
-              | extra::MAP_POPULATE,
-                fd,
-                offset)
-        };
-        if address == posix88_c::MAP_FAILED {
-            return Err(errno());
-        };
-        Ok(MemoryMap { address: address, length: length })
+    pub struct MemoryMap {
+        address: *mut c_void,
+        length: u64,
     }
-    pub fn as_bytes(&self) -> &[u8] {
-        unsafe {
-            std::slice::from_raw_parts(
-                self.address as *const u8, NumCast::from(self.length).unwrap())
+
+    impl MemoryMap {
+        pub fn map(fd: c95_t::c_int, offset: i64, length: u64)
+                   -> Result<MemoryMap, i32>
+        {
+            let address = unsafe {
+                posix88_f::mman::mmap(
+                    0 as *mut c_void,
+                    length,
+                    posix88_c::PROT_READ,
+                    posix88_c::MAP_PRIVATE
+                  | extra::MAP_POPULATE,
+                    fd,
+                    offset)
+            };
+            if address == posix88_c::MAP_FAILED {
+                return Err(::errno());
+            };
+            Ok(MemoryMap { address: address, length: length })
+        }
+        pub fn as_bytes(&self) -> &[u8] {
+            unsafe {
+                slice::from_raw_parts(
+                    self.address as *const u8, NumCast::from(self.length).unwrap())
+            }
+        }
+    }
+
+    impl Drop for MemoryMap {
+        fn drop(&mut self) {
+            unsafe {
+                posix88_f::mman::munmap(
+                    self.address,
+                    self.length)
+            };
         }
     }
 }
 
-impl Drop for MemoryMap {
-    fn drop(&mut self) {
-        unsafe {
-            posix88_f::mman::munmap(
-                self.address,
-                self.length)
-        };
-    }
-}
 
 fn print_offset(offset: i64) {
     print!("{:08x}  ", offset)
@@ -237,7 +244,8 @@ fn read_print_file(path: &str) -> Result<(), ()> {
             } else {
                 remaining_file_size
             }).unwrap();
-        let maybe_memory_map = MemoryMap::map(fd.raw(), offset, map_size);
+        let maybe_memory_map = memory_map::MemoryMap::map(
+            fd.raw(), offset, map_size);
         let memory_map;
         match maybe_memory_map {
             Ok(m) => memory_map = m,
