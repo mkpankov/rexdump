@@ -8,19 +8,35 @@ use libc::types::os::arch::posix01;
 use libc::funcs::posix88 as posix88_f;
 use libc::consts::os::posix88 as posix88_c;
 use libc::consts::os::extra;
-use libc::funcs::c95::stdio;
+use libc::funcs::c95 as c95_f;
 use libc::types::os::arch::c95 as c95_t;
 
 use num::traits::NumCast;
 
 use std::ffi::CString;
+use std::ffi::CStr;
 
 use std::env;
 use std::io::{self, Write};
 use std::process;
+use std::str;
 
 fn errno() -> i32 {
     io::Error::last_os_error().raw_os_error().unwrap_or(-1)
+}
+
+fn print_error(error: &str) {
+    let mut stderr = std::io::stderr();
+    writeln!(&mut stderr, "{}", error).unwrap();
+}
+
+fn strerror(errno: c95_t::c_int) -> &'static str {
+    let s = unsafe {
+        c95_f::string::strerror(errno)
+    };
+    unsafe {
+        str::from_utf8(CStr::from_ptr(s).to_bytes()).unwrap()
+    }
 }
 
 struct Fd {
@@ -139,11 +155,8 @@ fn read_print_file(path: &str) -> Result<(), ()> {
     let fd: Fd;
     match maybe_fd {
         Ok(f) => fd = f,
-        Err(_) => {
-            let c_error = CString::new("Couldn't open file").unwrap();
-            unsafe {
-                stdio::perror(c_error.as_ptr());
-            }
+        Err(errno) => {
+            print_error(&format!("Couldn't open file: {}", strerror(errno)));
             return Err(());
         }
     }
@@ -156,7 +169,7 @@ fn read_print_file(path: &str) -> Result<(), ()> {
     if result == -1 {
         let c_error = CString::new("Couldn't get file into").unwrap();
         unsafe {
-            stdio::perror(c_error.as_ptr());
+            c95_f::stdio::perror(c_error.as_ptr());
         }
         return Err(());
     }
@@ -183,7 +196,7 @@ fn read_print_file(path: &str) -> Result<(), ()> {
         if address == posix88_c::MAP_FAILED {
             let c_error = CString::new("Couldn't read file").unwrap();
             unsafe {
-                stdio::perror(c_error.as_ptr());
+                c95_f::stdio::perror(c_error.as_ptr());
             }
             return Err(());
         };
@@ -203,7 +216,7 @@ fn read_print_file(path: &str) -> Result<(), ()> {
         if result == -1 {
             let c_error = CString::new("Couldn't unmap file").unwrap();
             unsafe {
-                stdio::perror(c_error.as_ptr());
+                c95_f::stdio::perror(c_error.as_ptr());
             }
         }
 
