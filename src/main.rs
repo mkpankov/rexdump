@@ -71,6 +71,48 @@ impl Drop for Fd {
     }
 }
 
+struct MemoryMap {
+    address: * mut c_void,
+    length: u64,
+}
+
+impl MemoryMap {
+    pub fn map(fd: c95_t::c_int, offset: i64, length: u64)
+               -> Result<MemoryMap, i32>
+    {
+        let address = unsafe {
+            posix88_f::mman::mmap(
+                0 as *mut c_void,
+                length,
+                posix88_c::PROT_READ,
+                posix88_c::MAP_PRIVATE
+              | extra::MAP_POPULATE,
+                fd,
+                offset)
+        };
+        if address == posix88_c::MAP_FAILED {
+            return Err(errno());
+        };
+        Ok(MemoryMap { address: address, length: length })
+    }
+    pub fn as_bytes(&self) -> &[u8] {
+        unsafe {
+            std::slice::from_raw_parts(
+                self.address as *const u8, NumCast::from(self.length).unwrap())
+        }
+    }
+}
+
+impl Drop for MemoryMap {
+    fn drop(&mut self) {
+        unsafe {
+            posix88_f::mman::munmap(
+                self.address,
+                self.length)
+        };
+    }
+}
+
 fn print_offset(offset: i64) {
     print!("{:08x}  ", offset)
 }
@@ -183,42 +225,19 @@ fn read_print_file(path: &str) -> Result<(), ()> {
             } else {
                 remaining_file_size
             }).unwrap();
-        let address = unsafe {
-            posix88_f::mman::mmap(
-                0 as *mut c_void,
-                map_size,
-                posix88_c::PROT_READ,
-                posix88_c::MAP_PRIVATE
-              | extra::MAP_POPULATE,
-                fd.raw(),
-                offset)
-        };
-        if address == posix88_c::MAP_FAILED {
-            let c_error = CString::new("Couldn't read file").unwrap();
-            unsafe {
-                c95_f::stdio::perror(c_error.as_ptr());
-            }
-            return Err(());
-        };
-
-        let buffer : &[u8] = unsafe {
-            std::slice::from_raw_parts(
-                address as *const u8, NumCast::from(map_size).unwrap())
-        };
-
-        print_contents(buffer, NumCast::from(map_size).unwrap(), offset);
-
-        let result = unsafe {
-            posix88_f::mman::munmap(
-                address,
-                map_size)
-        };
-        if result == -1 {
-            let c_error = CString::new("Couldn't unmap file").unwrap();
-            unsafe {
-                c95_f::stdio::perror(c_error.as_ptr());
+        let maybe_memory_map = MemoryMap::map(fd.raw(), offset, map_size);
+        let memory_map;
+        match maybe_memory_map {
+            Ok(m) => memory_map = m,
+            Err(errno) => {
+                print_error(&format!("Couldn't read file: {}", strerror(errno)));
+                return Err(());
             }
         }
+
+        let buffer = memory_map.as_bytes();
+
+        print_contents(buffer, NumCast::from(map_size).unwrap(), offset);
 
         let diff: i64 = NumCast::from(map_size).unwrap();
         remaining_file_size -= diff;
