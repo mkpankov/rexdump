@@ -3,17 +3,21 @@
 extern crate libc;
 extern crate num;
 
+use libc::types::common::c95::c_void;
+use libc::types::os::arch::posix01;
+use libc::funcs::posix88 as posix88_f;
+use libc::consts::os::posix88 as posix88_c;
+use libc::consts::os::extra;
+use libc::funcs::c95::stdio;
+use libc::types::os::arch::c95 as c95_t;
+
+use num::traits::NumCast;
+
 use std::ffi::CString;
 
 use std::env;
 use std::io::Write;
 use std::process;
-
-use libc::types::common::c95::c_void;
-use libc::funcs::posix88 as posix88_f;
-use libc::consts::os::posix88 as posix88_c;
-use libc::consts::os::extra;
-use libc::funcs::c95::stdio;
 
 fn print_offset(offset: i64) {
     print!("{:08x}  ", offset)
@@ -109,7 +113,7 @@ fn read_print_file(path: &str) -> Result<(), ()> {
         }
         return Err(());
     }
-    let mut file_info : libc::types::os::arch::posix01::stat = unsafe {
+    let mut file_info : posix01::stat = unsafe {
         std::mem::uninitialized()
     };
     let result = unsafe {
@@ -126,10 +130,10 @@ fn read_print_file(path: &str) -> Result<(), ()> {
         return Err(());
     }
     let mut remaining_file_size = file_info.st_size;
-    let page_size : i64 = num::traits::NumCast::from(std::env::page_size()).unwrap();
+    let page_size : i64 = NumCast::from(std::env::page_size()).unwrap();
     let mut offset = 0;
     while remaining_file_size > 0 {
-        let map_size: u64 = num::traits::NumCast::from(
+        let map_size: u64 = NumCast::from(
             if remaining_file_size > page_size {
                 page_size
             } else {
@@ -158,10 +162,10 @@ fn read_print_file(path: &str) -> Result<(), ()> {
 
         let buffer : &[u8] = unsafe {
             std::slice::from_raw_parts(
-                address as *const u8, num::traits::NumCast::from(map_size).unwrap())
+                address as *const u8, NumCast::from(map_size).unwrap())
         };
 
-        print_contents(buffer, num::traits::NumCast::from(map_size).unwrap(), offset);
+        print_contents(buffer, NumCast::from(map_size).unwrap(), offset);
 
         let result = unsafe {
             posix88_f::mman::munmap(
@@ -175,7 +179,7 @@ fn read_print_file(path: &str) -> Result<(), ()> {
             }
         }
 
-        let diff: i64 = num::traits::NumCast::from(map_size).unwrap();
+        let diff: i64 = NumCast::from(map_size).unwrap();
         remaining_file_size -= diff;
         offset += diff;
     }
