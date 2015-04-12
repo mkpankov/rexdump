@@ -120,6 +120,9 @@ fn read_print_file(path: &str) -> Result<(), ()> {
         unsafe {
             stdio::perror(c_error.as_ptr());
         }
+        unsafe {
+            posix88_f::unistd::close(fd);
+        }
         return Err(());
     }
     let mut remaining_file_size = file_info.st_size;
@@ -146,6 +149,9 @@ fn read_print_file(path: &str) -> Result<(), ()> {
             let c_error = CString::new("Couldn't read file").unwrap();
             unsafe {
                 stdio::perror(c_error.as_ptr());
+            }
+            unsafe {
+                posix88_f::unistd::close(fd);
             }
             return Err(());
         };
