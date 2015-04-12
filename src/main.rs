@@ -1,6 +1,7 @@
-#![feature(core, libc, page_size)]
+#![feature(page_size)]
 
 extern crate libc;
+extern crate num;
 
 use std::ffi::CString;
 
@@ -43,7 +44,7 @@ fn print_chars(buffer: &[u8]) {
     for c in buffer {
         let is_print = unsafe {
             libc::funcs::c95::ctype::isprint(
-                std::num::cast(*c).unwrap()) != 0
+                num::traits::NumCast::from(*c).unwrap()) != 0
         };
         if is_print {
             print!("{}", *c as char);
@@ -122,10 +123,10 @@ fn read_print_file(path: &str) -> Result<(), ()> {
         return Err(());
     }
     let mut remaining_file_size = file_info.st_size;
-    let page_size : i64 = std::num::cast(std::env::page_size()).unwrap();
+    let page_size : i64 = num::traits::NumCast::from(std::env::page_size()).unwrap();
     let mut offset = 0;
     while remaining_file_size > 0 {
-        let map_size: u64 = std::num::cast(
+        let map_size: u64 = num::traits::NumCast::from(
             if remaining_file_size > page_size {
                 page_size
             } else {
@@ -151,10 +152,10 @@ fn read_print_file(path: &str) -> Result<(), ()> {
 
         let buffer : &[u8] = unsafe {
             std::slice::from_raw_parts(
-                address as *const u8, std::num::cast(map_size).unwrap())
+                address as *const u8, num::traits::NumCast::from(map_size).unwrap())
         };
 
-        print_contents(buffer, std::num::cast(map_size).unwrap(), offset);
+        print_contents(buffer, num::traits::NumCast::from(map_size).unwrap(), offset);
 
         let result = unsafe {
             posix88_f::mman::munmap(
@@ -168,7 +169,7 @@ fn read_print_file(path: &str) -> Result<(), ()> {
             }
         }
 
-        let diff: i64 = std::num::cast(map_size).unwrap();
+        let diff: i64 = num::traits::NumCast::from(map_size).unwrap();
         remaining_file_size -= diff;
         offset += diff;
     }

@@ -2,3 +2,8 @@
 name = "rexdump"
 version = "0.0.1"
 authors = ["Michael Pankov <work@michaelpankov.com>"]
+
+[dependencies]
+
+libc = "*"
+num = "*"
