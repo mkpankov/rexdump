@@ -3,13 +3,7 @@
 extern crate libc;
 extern crate num;
 
-use libc::types::os::arch::posix01;
-use libc::funcs::posix88 as posix88_f;
-use libc::funcs::c95 as c95_f;
-
 use num::traits::NumCast;
-
-use std::ffi::CString;
 
 use std::env;
 use std::io::{self, Write};
@@ -45,8 +39,10 @@ mod fd {
 
     use libc::consts::os::posix88 as posix88_c;
     use libc::funcs::posix88 as posix88_f;
+    use libc::types::os::arch::posix01;
 
     use std::ffi::CString;
+    use std::mem;
 
     pub struct Fd {
         raw_fd: c95_t::c_int,
@@ -69,6 +65,18 @@ mod fd {
         }
         pub fn raw(&self) -> c95_t::c_int {
             self.raw_fd
+        }
+        pub fn get_size(&self) -> Result<i64, i32> {
+            let mut file_info: posix01::stat = unsafe {
+                mem::uninitialized()
+            };
+            let result = unsafe {
+                posix88_f::stat_::fstat(self.raw(), &mut file_info)
+            };
+            if result == -1 {
+                return Err(::errno());
+            }
+            Ok(file_info.st_size)
         }
     }
 
@@ -225,20 +233,7 @@ fn read_print_file(path: &str) -> Result<(), ()> {
             return Err(());
         }
     }
-    let mut file_info : posix01::stat = unsafe {
-        std::mem::uninitialized()
-    };
-    let result = unsafe {
-        posix88_f::stat_::fstat(fd.raw(), & mut file_info)
-    };
-    if result == -1 {
-        let c_error = CString::new("Couldn't get file into").unwrap();
-        unsafe {
-            c95_f::stdio::perror(c_error.as_ptr());
-        }
-        return Err(());
-    }
-    let mut remaining_file_size = file_info.st_size;
+    let mut remaining_file_size = fd.get_size().unwrap();
     let page_size : i64 = NumCast::from(std::env::page_size()).unwrap();
     let mut offset = 0;
     while remaining_file_size > 0 {
