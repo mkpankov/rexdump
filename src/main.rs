@@ -19,6 +19,34 @@ use std::env;
 use std::io::Write;
 use std::process;
 
+struct Fd {
+    raw_fd: c95_t::c_int,
+}
+
+impl Fd {
+    pub fn open(path: &str) -> Fd {
+        let c_path = CString::new(path).unwrap();
+        let fd = unsafe {
+            posix88_f::fcntl::open(
+                c_path.as_ptr(),
+                posix88_c::O_RDONLY,
+                0)
+        };
+        Fd { raw_fd: fd }
+    }
+    pub fn raw(&self) -> c95_t::c_int {
+        self.raw_fd
+    }
+}
+
+impl Drop for Fd {
+    fn drop(&mut self) {
+        unsafe {
+            posix88_f::unistd::close(self.raw_fd);
+        }
+    }
+}
+
 fn print_offset(offset: i64) {
     print!("{:08x}  ", offset)
 }
@@ -99,14 +127,8 @@ fn print_contents(buffer: &[u8], buffer_size: i64, offset: i64) {
 }
 
 fn read_print_file(path: &str) -> Result<(), ()> {
-    let c_path = CString::new(path).unwrap();
-    let fd = unsafe {
-        posix88_f::fcntl::open(
-            c_path.as_ptr(),
-            posix88_c::O_RDONLY,
-            0)
-    };
-    if fd == -1 {
+    let fd = Fd::open(path);
+    if fd.raw() == -1 {
         let c_error = CString::new("Couldn't open file").unwrap();
         unsafe {
             stdio::perror(c_error.as_ptr());
@@ -117,15 +139,12 @@ fn read_print_file(path: &str) -> Result<(), ()> {
         std::mem::uninitialized()
     };
     let result = unsafe {
-        posix88_f::stat_::fstat(fd, & mut file_info)
+        posix88_f::stat_::fstat(fd.raw(), & mut file_info)
     };
     if result == -1 {
         let c_error = CString::new("Couldn't get file into").unwrap();
         unsafe {
             stdio::perror(c_error.as_ptr());
-        }
-        unsafe {
-            posix88_f::unistd::close(fd);
         }
         return Err(());
     }
@@ -146,16 +165,13 @@ fn read_print_file(path: &str) -> Result<(), ()> {
                 posix88_c::PROT_READ,
                 posix88_c::MAP_PRIVATE
               | extra::MAP_POPULATE,
-                fd,
+                fd.raw(),
                 offset)
         };
         if address == posix88_c::MAP_FAILED {
             let c_error = CString::new("Couldn't read file").unwrap();
             unsafe {
                 stdio::perror(c_error.as_ptr());
-            }
-            unsafe {
-                posix88_f::unistd::close(fd);
             }
             return Err(());
         };
@@ -182,10 +198,6 @@ fn read_print_file(path: &str) -> Result<(), ()> {
         let diff: i64 = NumCast::from(map_size).unwrap();
         remaining_file_size -= diff;
         offset += diff;
-    }
-
-    unsafe {
-        posix88_f::unistd::close(fd);
     }
 
     Ok(())
