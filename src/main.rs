@@ -39,34 +39,46 @@ fn strerror(errno: c95_t::c_int) -> &'static str {
     }
 }
 
-struct Fd {
-    raw_fd: c95_t::c_int,
-}
 
-impl Fd {
-    pub fn open(path: &str) -> Result<Fd, i32> {
-        let c_path = CString::new(path).unwrap();
-        let fd = unsafe {
-            posix88_f::fcntl::open(
-                c_path.as_ptr(),
-                posix88_c::O_RDONLY,
-                0)
-        };
-        if fd == -1 {
-            return Err(errno());
+mod fd {
+    use libc::types::common::c95::c_void;
+    use libc::types::os::arch::c95 as c95_t;
+
+    use libc::consts::os::posix88 as posix88_c;
+    use libc::funcs::posix88 as posix88_f;
+
+    use std::ffi::CString;
+
+    pub struct Fd {
+        raw_fd: c95_t::c_int,
+    }
+
+    impl Fd {
+        pub fn open(path: &str) -> Result<Fd, i32> {
+            let c_path = CString::new(path).unwrap();
+            let fd = unsafe {
+                posix88_f::fcntl::open(
+                    c_path.as_ptr(),
+                    posix88_c::O_RDONLY,
+                    0)
+            };
+            if fd == -1 {
+                return Err(::errno());
+            }
+
+            Ok(Fd { raw_fd: fd })
         }
-
-        Ok(Fd { raw_fd: fd })
+        pub fn raw(&self) -> c95_t::c_int {
+            self.raw_fd
+        }
     }
-    pub fn raw(&self) -> c95_t::c_int {
-        self.raw_fd
-    }
-}
 
-impl Drop for Fd {
-    fn drop(&mut self) {
-        unsafe {
-            posix88_f::unistd::close(self.raw_fd);
+
+    impl Drop for Fd {
+        fn drop(&mut self) {
+            unsafe {
+                posix88_f::unistd::close(self.raw_fd);
+            }
         }
     }
 }
@@ -193,8 +205,8 @@ fn print_contents(buffer: &[u8], buffer_size: i64, offset: i64) {
 }
 
 fn read_print_file(path: &str) -> Result<(), ()> {
-    let maybe_fd = Fd::open(path);
-    let fd: Fd;
+    let maybe_fd = fd::Fd::open(path);
+    let fd: fd::Fd;
     match maybe_fd {
         Ok(f) => fd = f,
         Err(errno) => {
