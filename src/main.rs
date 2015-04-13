@@ -3,6 +3,9 @@
 extern crate libc;
 extern crate num;
 
+#[macro_use(syscall)]
+extern crate syscall;
+
 use num::traits::NumCast;
 
 use std::env;
@@ -52,16 +55,17 @@ mod fd {
         pub fn open(path: &str) -> Result<Fd, i32> {
             let c_path = CString::new(path).unwrap();
             let fd = unsafe {
-                posix88_f::fcntl::open(
+                syscall!(
+                    OPEN,
                     c_path.as_ptr(),
                     posix88_c::O_RDONLY,
                     0)
-            };
-            if fd == -1 {
-                return Err(::errno());
+            } as i32;
+            if fd > -1000 && fd < 0 {
+                return Err(-fd);
             }
 
-            Ok(Fd { raw_fd: fd })
+            Ok(Fd { raw_fd: fd as i32 })
         }
         pub fn raw(&self) -> c95_t::c_int {
             self.raw_fd
