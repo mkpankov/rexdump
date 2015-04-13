@@ -113,7 +113,8 @@ mod memory_map {
                    -> Result<MemoryMap, i32>
         {
             let address = unsafe {
-                posix88_f::mman::mmap(
+                syscall!(
+                    MMAP,
                     0 as *mut c_void,
                     length,
                     posix88_c::PROT_READ,
@@ -121,10 +122,12 @@ mod memory_map {
                   | extra::MAP_POPULATE,
                     fd,
                     offset)
-            };
-            if address == posix88_c::MAP_FAILED {
-                return Err(::errno());
-            };
+            } as *mut c_void;
+            let address_code = address as i32;
+            if address_code > -1000 && address_code < 0 {
+                return Err(-address_code);
+            }
+
             Ok(MemoryMap { address: address, length: length })
         }
         pub fn as_bytes(&self) -> &[u8] {
