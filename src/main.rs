@@ -88,7 +88,9 @@ mod fd {
     impl Drop for Fd {
         fn drop(&mut self) {
             unsafe {
-                posix88_f::unistd::close(self.raw_fd);
+                syscall!(
+                    CLOSE,
+                    self.raw_fd);
             }
         }
     }
@@ -98,7 +100,6 @@ mod memory_map {
     use std::slice;
     use num::traits::NumCast;
     use libc::consts::os::posix88 as posix88_c;
-    use libc::funcs::posix88 as posix88_f;
     use libc::types::common::c95::c_void;
     use libc::consts::os::extra;
     use libc::types::os::arch::c95 as c95_t;
@@ -141,7 +142,8 @@ mod memory_map {
     impl Drop for MemoryMap {
         fn drop(&mut self) {
             unsafe {
-                posix88_f::mman::munmap(
+                syscall!(
+                    MUNMAP,
                     self.address,
                     self.length)
             };
