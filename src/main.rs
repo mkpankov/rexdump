@@ -65,7 +65,7 @@ mod fd {
                 return Err(-fd);
             }
 
-            Ok(Fd { raw_fd: fd as i32 })
+            Ok(Fd { raw_fd: fd })
         }
         pub fn raw(&self) -> c95_t::c_int {
             self.raw_fd
