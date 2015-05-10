@@ -233,15 +233,14 @@ fn print_contents(buffer: &[u8], buffer_size: i64, offset: i64) {
 
 fn read_print_file(path: &str) -> Result<(), ()> {
     let maybe_fd = fd::Fd::open(path);
-    let fd: fd::Fd;
-    match maybe_fd {
-        Ok(f) => fd = f,
+    let fd = match maybe_fd {
+        Ok(f) => f,
         Err(errno) => {
             print_error(
                 &format!("Couldn't open file: {}", c_helpers::strerror(errno)));
             return Err(());
         }
-    }
+    };
     let mut remaining_file_size = fd.get_size().unwrap();
     let page_size : i64 = NumCast::from(std::env::page_size()).unwrap();
     let mut offset = 0;
